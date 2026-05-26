@@ -17,6 +17,12 @@ steps:
           gcr.io/$PROJECT_ID/user-management-api:$SHORT_SHA \
           pytest -v --cov=app --cov-report=term-missing
 
+  - name: "gcr.io/cloud-builders/docker"
+    id: "push-image"
+    args:
+      - "push"
+      - "gcr.io/$PROJECT_ID/user-management-api:$SHORT_SHA"
+
   - name: "gcr.io/google.com/cloudsdktool/cloud-sdk"
     id: "deploy-to-cloud-run"
     entrypoint: "bash"
