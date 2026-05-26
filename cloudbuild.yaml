@@ -1,11 +1,13 @@
 steps:
-  - name: "gcr.io/cloud-builders/docker"
-    id: "build-image"
+  - name: "gcr.io/google.com/cloudsdktool/cloud-sdk"
+    id: "build-and-push"
+    entrypoint: "bash"
     args:
-      - "build"
-      - "-t"
-      - "$_REGION-docker.pkg.dev/$PROJECT_ID/$_AR_REPO/user-management-api:$SHORT_SHA"
-      - "."
+      - "-c"
+      - |
+        gcloud auth configure-docker $_REGION-docker.pkg.dev --quiet
+        docker build -t $_REGION-docker.pkg.dev/$PROJECT_ID/$_AR_REPO/user-management-api:$SHORT_SHA .
+        docker push $_REGION-docker.pkg.dev/$PROJECT_ID/$_AR_REPO/user-management-api:$SHORT_SHA
 
   - name: "gcr.io/cloud-builders/docker"
     id: "run-tests"
@@ -16,12 +18,6 @@ steps:
         docker run --rm \
           $_REGION-docker.pkg.dev/$PROJECT_ID/$_AR_REPO/user-management-api:$SHORT_SHA \
           pytest -v --cov=app --cov-report=term-missing
-
-  - name: "gcr.io/cloud-builders/docker"
-    id: "push-image"
-    args:
-      - "push"
-      - "$_REGION-docker.pkg.dev/$PROJECT_ID/$_AR_REPO/user-management-api:$SHORT_SHA"
 
   - name: "gcr.io/google.com/cloudsdktool/cloud-sdk"
     id: "deploy-to-cloud-run"
