@@ -4,7 +4,7 @@ steps:
     args:
       - "build"
       - "-t"
-      - "$_REGION-docker.pkg.dev/$PROJECT_ID/$_AR_REPO/user-management-api:$SHORT_SHA"
+      - "gcr.io/$PROJECT_ID/user-management-api:$SHORT_SHA"
       - "."
 
   - name: "gcr.io/cloud-builders/docker"
@@ -14,7 +14,7 @@ steps:
       - "-c"
       - |
         docker run --rm \
-          $_REGION-docker.pkg.dev/$PROJECT_ID/$_AR_REPO/user-management-api:$SHORT_SHA \
+          gcr.io/$PROJECT_ID/user-management-api:$SHORT_SHA \
           pytest -v --cov=app --cov-report=term-missing
 
   - name: "gcr.io/google.com/cloudsdktool/cloud-sdk"
@@ -24,7 +24,7 @@ steps:
       - "-c"
       - |
         gcloud run deploy user-management-api \
-          --image $_REGION-docker.pkg.dev/$PROJECT_ID/$_AR_REPO/user-management-api:$SHORT_SHA \
+          --image gcr.io/$PROJECT_ID/user-management-api:$SHORT_SHA \
           --region $_REGION \
           --platform managed \
           --allow-unauthenticated \
@@ -36,7 +36,7 @@ steps:
           --set-env-vars LOG_LEVEL=INFO
 
 images:
-  - "$_REGION-docker.pkg.dev/$PROJECT_ID/$_AR_REPO/user-management-api:$SHORT_SHA"
+  - "gcr.io/$PROJECT_ID/user-management-api:$SHORT_SHA"
 
 timeout: "1800s"
 
@@ -45,7 +45,6 @@ options:
 
 substitutions:
   _REGION: us-central1
-  _AR_REPO: user-management-api
   _SA_NAME: user-api-cloud-run
   _CLOUDSQL_INSTANCE: user-management-db
   _DATABASE_URL_SECRET: database-url
