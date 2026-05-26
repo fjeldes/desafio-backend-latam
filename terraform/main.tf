@@ -162,9 +162,12 @@ resource "google_secret_manager_secret" "database_url" {
 
 resource "google_secret_manager_secret_version" "database_url_version" {
   secret = google_secret_manager_secret.database_url.id
-  secret_data = (
-    "postgresql+psycopg2://${google_sql_user.app_user.name}:${random_password.db_password.result}@/"
-    + "${google_sql_database.app_db.name}?host=/cloudsql/${google_sql_database_instance.postgres.connection_name}"
+  secret_data = format(
+    "postgresql+psycopg2://%s:%s@/%s?host=/cloudsql/%s",
+    google_sql_user.app_user.name,
+    random_password.db_password.result,
+    google_sql_database.app_db.name,
+    google_sql_database_instance.postgres.connection_name,
   )
 }
 
@@ -177,4 +180,18 @@ resource "google_secret_manager_secret_iam_member" "cloudbuild_secret_accessor" 
   secret_id = google_secret_manager_secret.database_url.id
   role      = "roles/secretmanager.secretAccessor"
   member    = "serviceAccount:${data.google_project.current.number}@cloudbuild.gserviceaccount.com"
+}
+
+# Grant Cloud Build permissions to deploy to Cloud Run
+
+resource "google_project_iam_member" "cloudbuild_run_admin" {
+  project = var.project_id
+  role    = "roles/run.admin"
+  member  = "serviceAccount:${data.google_project.current.number}@cloudbuild.gserviceaccount.com"
+}
+
+resource "google_project_iam_member" "cloudbuild_sa_user" {
+  project = var.project_id
+  role    = "roles/iam.serviceAccountUser"
+  member  = "serviceAccount:${data.google_project.current.number}@cloudbuild.gserviceaccount.com"
 }
