@@ -1,0 +1,13 @@
+# terraform.tfvars
+# Copy this file to terraform.tfvars and fill in your values.
+
+project_id = "your-gcp-project-id"
+region     = "us-central1"
+
+# Optionally override these defaults:
+# artifact_registry_repo = "user-management-api"
+# service_account_id     = "user-api-cloud-run"
+# sql_instance_name      = "user-management-db"
+# sql_tier               = "db-f1-micro"
+# db_name                = "users_db"
+# db_user                = "app_user"
