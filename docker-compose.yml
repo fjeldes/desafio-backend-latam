@@ -1,0 +1,19 @@
+services:
+  api:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      - DATABASE_URL=sqlite:///./users.db
+      - LOG_LEVEL=INFO
+    volumes:
+      - ./app:/app/app
+      - ./tests:/app/tests
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8080 --reload
+
+  test:
+    build: .
+    environment:
+      - DATABASE_URL=sqlite:///./test.db
+      - LOG_LEVEL=ERROR
+    command: pytest -v --cov=app --cov-report=term-missing
