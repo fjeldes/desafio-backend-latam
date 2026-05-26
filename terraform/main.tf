@@ -96,8 +96,7 @@ resource "google_sql_database_instance" "postgres" {
     availability_type = "ZONAL"
 
     ip_configuration {
-      ipv4_enabled    = true
-      require_ssl     = false
+      ipv4_enabled = true
       authorized_networks {
         name  = "Cloud Run"
         value = "0.0.0.0/0"

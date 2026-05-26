@@ -41,7 +41,7 @@ output "db_password_secret_resource" {
 
 output "next_steps" {
   description = "Commands to run after terraform apply"
-  value = <<-EOT
+  value       = <<-EOT
     1. Retrieve the DATABASE_URL (already stored as a Secret Manager secret).
        Secret resource ID: projects/${var.project_id}/secrets/${google_secret_manager_secret.database_url.secret_id}/versions/latest
 
