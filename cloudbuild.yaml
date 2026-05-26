@@ -4,7 +4,7 @@ steps:
     args:
       - "build"
       - "-t"
-      - "$LOCATION-docker.pkg.dev/$PROJECT_ID/$_AR_REPO/user-management-api:$SHORT_SHA"
+      - "$_REGION-docker.pkg.dev/$PROJECT_ID/$_AR_REPO/user-management-api:$SHORT_SHA"
       - "."
 
   - name: "gcr.io/cloud-builders/docker"
@@ -14,14 +14,14 @@ steps:
       - "-c"
       - |
         docker run --rm \
-          $LOCATION-docker.pkg.dev/$PROJECT_ID/$_AR_REPO/user-management-api:$SHORT_SHA \
+          $_REGION-docker.pkg.dev/$PROJECT_ID/$_AR_REPO/user-management-api:$SHORT_SHA \
           pytest -v --cov=app --cov-report=term-missing
 
   - name: "gcr.io/cloud-builders/docker"
     id: "push-image"
     args:
       - "push"
-      - "$LOCATION-docker.pkg.dev/$PROJECT_ID/$_AR_REPO/user-management-api:$SHORT_SHA"
+      - "$_REGION-docker.pkg.dev/$PROJECT_ID/$_AR_REPO/user-management-api:$SHORT_SHA"
 
   - name: "gcr.io/google.com/cloudsdktool/cloud-sdk"
     id: "deploy-to-cloud-run"
@@ -30,7 +30,7 @@ steps:
       - "-c"
       - |
         gcloud run deploy user-management-api \
-          --image $LOCATION-docker.pkg.dev/$PROJECT_ID/$_AR_REPO/user-management-api:$SHORT_SHA \
+          --image $_REGION-docker.pkg.dev/$PROJECT_ID/$_AR_REPO/user-management-api:$SHORT_SHA \
           --region $_REGION \
           --platform managed \
           --allow-unauthenticated \
@@ -42,7 +42,7 @@ steps:
           --set-env-vars LOG_LEVEL=INFO
 
 images:
-  - "$LOCATION-docker.pkg.dev/$PROJECT_ID/$_AR_REPO/user-management-api:$SHORT_SHA"
+  - "$_REGION-docker.pkg.dev/$PROJECT_ID/$_AR_REPO/user-management-api:$SHORT_SHA"
 
 timeout: "1800s"
 
