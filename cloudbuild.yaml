@@ -18,21 +18,6 @@ steps:
           pytest -v --cov=app --cov-report=term-missing
 
   - name: "gcr.io/google.com/cloudsdktool/cloud-sdk"
-    id: "configure-docker-auth"
-    entrypoint: "gcloud"
-    args:
-      - "auth"
-      - "configure-docker"
-      - "$_REGION-docker.pkg.dev"
-      - "--quiet"
-
-  - name: "gcr.io/cloud-builders/docker"
-    id: "push-image"
-    args:
-      - "push"
-      - "$_REGION-docker.pkg.dev/$PROJECT_ID/$_AR_REPO/user-management-api:$SHORT_SHA"
-
-  - name: "gcr.io/google.com/cloudsdktool/cloud-sdk"
     id: "deploy-to-cloud-run"
     entrypoint: "bash"
     args:
@@ -49,6 +34,9 @@ steps:
           --add-cloudsql-instances $PROJECT_ID:$_REGION:$_CLOUDSQL_INSTANCE \
           --set-secrets DATABASE_URL=$_DATABASE_URL_SECRET:latest \
           --set-env-vars LOG_LEVEL=INFO
+
+images:
+  - "$_REGION-docker.pkg.dev/$PROJECT_ID/$_AR_REPO/user-management-api:$SHORT_SHA"
 
 timeout: "1800s"
 
