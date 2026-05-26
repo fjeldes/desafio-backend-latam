@@ -201,3 +201,11 @@ resource "google_project_iam_member" "cloudbuild_artifact_writer" {
   role    = "roles/artifactregistry.writer"
   member  = "serviceAccount:${data.google_project.current.number}@cloudbuild.gserviceaccount.com"
 }
+
+# Grant Cloud Run service account access to read the DATABASE_URL secret
+
+resource "google_secret_manager_secret_iam_member" "cloudrun_secret_accessor" {
+  secret_id = google_secret_manager_secret.database_url.id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.cloud_run_sa.email}"
+}
