@@ -9,7 +9,6 @@ RESTful API for user management with full CRUD operations built with FastAPI.
 - **Pydantic** - Data validation
 - **Pytest** - Testing
 - **Docker** - Containerization
-- **Terraform** - Infrastructure as Code
 - **GCP Cloud Run / Cloud SQL / Cloud Build** - Deployment
 
 ## Quick Start with Docker
@@ -96,53 +95,102 @@ curl -X PATCH http://localhost:8080/users/{user_id}/deactivate
 |----------|-------------|---------|
 | `DATABASE_URL` | Database connection string | `sqlite:///./users.db` |
 | `LOG_LEVEL` | Logging level | `INFO` |
+| `RATE_LIMIT_ENABLED` | Toggle rate limiting (set to `"false"` to disable) | `true` |
+
+## Security Considerations
+
+### Data Validation
+All inputs are validated through Pydantic schemas with strict constraints:
+- `username`: 3-50 chars, alphanumeric + underscores only (regex pattern)
+- `email`: validated against RFC 5322 format via `EmailStr`
+- `first_name` / `last_name`: 1-100 chars, required
+- `role`: restricted enum (`admin`, `user`, `guest`)
+- Extraneous fields are silently ignored
+
+### Rate Limiting
+Per-IP rate limits protect the API from abuse. Limits are enforced via slowapi:
+
+| Endpoint | Limit |
+|---|---|
+| `GET /health` | No limit |
+| `GET /users`, `GET /users/{id}` | 60 req/min |
+| `POST /users` | 20 req/min |
+| `PUT /users/{id}` | 30 req/min |
+| `DELETE /users/{id}`, `PATCH .../deactivate` | 10 req/min |
+
+When a limit is exceeded, the API returns `HTTP 429 Too Many Requests`.
+
+### SQL Injection Prevention
+All database queries use SQLAlchemy's ORM with parameterized queries. No raw SQL is executed. The `check_same_thread=False` flag for SQLite is only used in development mode.
+
+### Cloud SQL Network Security
+The production database (Cloud SQL) does **not** expose its public IP to the internet. Cloud Run connects exclusively via the Cloud SQL Auth Proxy through a Unix socket (`/cloudsql/<connection_name>`), which authenticates using IAM service account credentials. No passwords or connection strings are stored in the container image.
+
+### Secrets Management
+- `DATABASE_URL` is injected at runtime via environment variable (local) or Google Secret Manager (production)
+- Deployments (`cloudbuild.yaml`) reference secrets by name, never by value
+
+### HTTPS
+Cloud Run provides automatic TLS termination. All traffic is encrypted in transit.
+
+### Production Hardening (recommended next steps)
+- **Authentication**: Add API key or JWT-based auth for write endpoints
+- **Distributed rate limiting**: Replace in-memory slowapi with Redis-backed rate limiter for multi-instance Cloud Run deployments
+- **CORS**: Restrict allowed origins via `CORSMiddleware` if the API is consumed from a browser
+- **Audit logging**: Log user mutations (create/update/delete) to a structured log sink
+- **Cloud SQL**: Consider using private IP + VPC for defense in depth, though the Auth Proxy already provides secure access
 
 ## Deployment to GCP
 
 ### 1. Prerequisites
 
 - [Google Cloud SDK](https://cloud.google.com/sdk/docs/install) installed
-- [Terraform](https://developer.hashicorp.com/terraform/downloads) >= 1.5 installed
 - A GCP project with billing enabled
+- Enable required APIs:
+  ```bash
+  gcloud services enable run.googleapis.com artifactregistry.googleapis.com \
+    cloudbuild.googleapis.com secretmanager.googleapis.com sqladmin.googleapis.com \
+    --project=<YOUR_PROJECT_ID>
+  ```
 
-### 2. Provision infrastructure with Terraform
+### 2. Create infrastructure (GCP Console or gcloud)
+
+Create the following resources manually (or use the GCP Console):
 
 ```bash
-cd terraform
+# Artifact Registry
+gcloud artifacts repositories create user-management-api \
+  --repository-format=docker --location=us-central1 \
+  --project=<YOUR_PROJECT_ID>
 
-# Copy and customize the variables file
-cp terraform.tfvars.example terraform.tfvars
-# Edit terraform.tfvars → set your project_id
+# Cloud SQL (PostgreSQL 16)
+gcloud sql instances create user-management-db \
+  --database-version=POSTGRES_16 --tier=db-f1-micro --region=us-central1 \
+  --project=<YOUR_PROJECT_ID>
+gcloud sql databases create users_db --instance=user-management-db --project=<YOUR_PROJECT_ID>
+gcloud sql users create app_user --instance=user-management-db --password=<YOUR_PASSWORD> \
+  --project=<YOUR_PROJECT_ID>
 
-# Login to GCP
-gcloud auth application-default login
+# Service Account for Cloud Run
+gcloud iam service-accounts create user-api-cloud-run \
+  --display-name="Cloud Run SA" --project=<YOUR_PROJECT_ID>
+gcloud projects add-iam-policy-binding <YOUR_PROJECT_ID> \
+  --member="serviceAccount:user-api-cloud-run@<YOUR_PROJECT_ID>.iam.gserviceaccount.com" \
+  --role="roles/cloudsql.client"
 
-# Initialize and apply
-terraform init
-terraform plan
-terraform apply
+# Store DATABASE_URL in Secret Manager
+echo -n "postgresql+psycopg2://app_user:<YOUR_PASSWORD>@/users_db?host=/cloudsql/<YOUR_PROJECT_ID>:us-central1:user-management-db" | \
+  gcloud secrets create database-url --data-file=- --project=<YOUR_PROJECT_ID>
 ```
 
-This creates:
-- **Artifact Registry** (Docker repository for container images)
-- **Cloud SQL** (PostgreSQL 16, db-f1-micro)
-- **Secret Manager** (DATABASE_URL stored securely)
-- **Service Account** (for Cloud Run with Cloud SQL permissions)
-- All required GCP APIs enabled
-
-### 3. Outputs after `terraform apply`
-
-After apply finishes, note the outputs. The `DATABASE_URL` secret is automatically stored in Secret Manager. You don't need to copy it manually.
-
-### 4. Connect GitHub to Cloud Build
+### 3. Connect GitHub to Cloud Build
 
 1. Go to [Cloud Build Triggers](https://console.cloud.google.com/cloud-build/triggers)
 2. Create a trigger linked to this GitHub repository
 3. Set branch: `^main$`
 4. Configuration: Cloud Build configuration file (`cloudbuild.yaml`)
-5. Update the substitution `_CLOUD_RUN_SA` in the trigger to match your project ID (replace `PROJECT`)
 
-### 5. Deploy
+### 4. Deploy
 
 Push to `main`:
 
@@ -152,19 +200,13 @@ git push origin main
 
 Cloud Build automatically:
 1. Builds the Docker image
-2. Runs tests
+2. Runs tests (unit + rate limiting)
 3. Pushes the image to Artifact Registry
-4. Deploys to Cloud Run with the correct Cloud SQL connection
+4. Deploys to Cloud Run with Cloud SQL connection and DATABASE_URL secret
 
-### 6. Test in production
+### 5. Test in production
 
 ```bash
 curl https://<cloud-run-url>/health
 curl https://<cloud-run-url>/docs
-```
-
-### Cleanup
-
-```bash
-cd terraform && terraform destroy
 ```

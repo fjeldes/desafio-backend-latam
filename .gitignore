@@ -5,12 +5,6 @@ __pycache__/
 venv/
 .env
 .venv/
-terraform.tfvars
-terraform/.terraform/
-terraform/*.tfstate
-terraform/*.tfstate.*
-terraform/*.backup
-*.plan
 *.egg-info/
 .pytest_cache/
 .coverage

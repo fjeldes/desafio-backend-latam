@@ -1,13 +1,32 @@
-import uuid
-import logging
+"""
+API route definitions for the User Management API.
 
-from fastapi import APIRouter, Depends, Query, status
+All routes are registered under the ``/users`` prefix and grouped under
+the ``users`` OpenAPI tag. Each endpoint delegates business logic to the
+functions in ``app.crud``.
+
+Rate limiting is applied per endpoint via slowapi decorators. Limits are
+per remote IP address and enforced in-memory.
+
+Route summary
+-------------
+GET    /users                    60/minute  List users (paginated, filterable)
+POST   /users                    20/minute  Create a new user
+GET    /users/{user_id}          60/minute  Get a single user by ID
+PUT    /users/{user_id}          30/minute  Fully update a user
+DELETE /users/{user_id}          10/minute  Permanently delete a user
+PATCH  /users/{user_id}/deactivate  10/minute  Soft-deactivate a user
+"""
+
+import uuid
+
+from fastapi import APIRouter, Depends, Query, Request, status
 from sqlalchemy.orm import Session
 
 from app import schemas, crud
 from app.database import get_db
+from app.limiter import rate_limit
 
-logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/users", tags=["users"])
 
 
@@ -17,7 +36,9 @@ router = APIRouter(prefix="/users", tags=["users"])
     summary="List all users",
     description="Retrieve a paginated list of users with optional filtering by active status and role.",
 )
+@rate_limit("60/minute")
 def list_users(
+    request: Request,
     skip: int = Query(default=0, ge=0, description="Number of records to skip"),
     limit: int = Query(
         default=100, ge=1, le=100, description="Maximum number of records to return"
@@ -30,6 +51,7 @@ def list_users(
     ),
     db: Session = Depends(get_db),
 ):
+    # Delegate to CRUD layer and wrap the result in the paginated response schema
     users, total = crud.get_users(db, skip=skip, limit=limit, active=active, role=role)
     return schemas.UserListResponse(
         users=users, total=total, skip=skip, limit=limit
@@ -42,7 +64,9 @@ def list_users(
     summary="Get a user by ID",
     description="Retrieve a single user by their unique identifier.",
 )
+@rate_limit("60/minute")
 def get_user(
+    request: Request,
     user_id: uuid.UUID,
     db: Session = Depends(get_db),
 ):
@@ -56,7 +80,9 @@ def get_user(
     summary="Create a new user",
     description="Create a new user with the provided data. Username and email must be unique.",
 )
+@rate_limit("20/minute")
 def create_user(
+    request: Request,
     user_data: schemas.UserCreate,
     db: Session = Depends(get_db),
 ):
@@ -69,7 +95,9 @@ def create_user(
     summary="Update a user",
     description="Update all fields of an existing user. Username and email must be unique.",
 )
+@rate_limit("30/minute")
 def update_user(
+    request: Request,
     user_id: uuid.UUID,
     user_data: schemas.UserUpdate,
     db: Session = Depends(get_db),
@@ -83,7 +111,9 @@ def update_user(
     summary="Delete a user",
     description="Permanently delete a user by their unique identifier.",
 )
+@rate_limit("10/minute")
 def delete_user(
+    request: Request,
     user_id: uuid.UUID,
     db: Session = Depends(get_db),
 ):
@@ -96,7 +126,9 @@ def delete_user(
     summary="Deactivate a user",
     description="Deactivate a user by setting their active status to false.",
 )
+@rate_limit("10/minute")
 def deactivate_user(
+    request: Request,
     user_id: uuid.UUID,
     db: Session = Depends(get_db),
 ):

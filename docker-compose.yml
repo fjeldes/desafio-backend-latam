@@ -16,4 +16,13 @@ services:
     environment:
       - DATABASE_URL=sqlite:///./test.db
       - LOG_LEVEL=ERROR
-    command: pytest -v --cov=app --cov-report=term-missing
+      - RATE_LIMIT_ENABLED=false
+    command: pytest -v --cov=app --cov-report=term-missing --ignore=tests/test_rate_limiting.py
+
+  test-rate-limit:
+    build: .
+    environment:
+      - DATABASE_URL=sqlite:///./test_ratelimit.db
+      - LOG_LEVEL=ERROR
+      - RATE_LIMIT_ENABLED=true
+    command: pytest -v tests/test_rate_limiting.py
