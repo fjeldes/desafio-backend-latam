@@ -146,42 +146,22 @@ Cloud Run provides automatic TLS termination. All traffic is encrypted in transi
 
 - [Google Cloud SDK](https://cloud.google.com/sdk/docs/install) installed
 - A GCP project with billing enabled
-- Enable required APIs:
-  ```bash
-  gcloud services enable run.googleapis.com artifactregistry.googleapis.com \
-    cloudbuild.googleapis.com secretmanager.googleapis.com sqladmin.googleapis.com \
-    --project=<YOUR_PROJECT_ID>
-  ```
 
-### 2. Create infrastructure (GCP Console or gcloud)
-
-Create the following resources manually (or use the GCP Console):
+### 2. Create infrastructure (one-time setup)
 
 ```bash
-# Artifact Registry
-gcloud artifacts repositories create user-management-api \
-  --repository-format=docker --location=us-central1 \
-  --project=<YOUR_PROJECT_ID>
-
-# Cloud SQL (PostgreSQL 16)
-gcloud sql instances create user-management-db \
-  --database-version=POSTGRES_16 --tier=db-f1-micro --region=us-central1 \
-  --project=<YOUR_PROJECT_ID>
-gcloud sql databases create users_db --instance=user-management-db --project=<YOUR_PROJECT_ID>
-gcloud sql users create app_user --instance=user-management-db --password=<YOUR_PASSWORD> \
-  --project=<YOUR_PROJECT_ID>
-
-# Service Account for Cloud Run
-gcloud iam service-accounts create user-api-cloud-run \
-  --display-name="Cloud Run SA" --project=<YOUR_PROJECT_ID>
-gcloud projects add-iam-policy-binding <YOUR_PROJECT_ID> \
-  --member="serviceAccount:user-api-cloud-run@<YOUR_PROJECT_ID>.iam.gserviceaccount.com" \
-  --role="roles/cloudsql.client"
-
-# Store DATABASE_URL in Secret Manager
-echo -n "postgresql+psycopg2://app_user:<YOUR_PASSWORD>@/users_db?host=/cloudsql/<YOUR_PROJECT_ID>:us-central1:user-management-db" | \
-  gcloud secrets create database-url --data-file=- --project=<YOUR_PROJECT_ID>
+export PROJECT_ID="<YOUR_PROJECT_ID>"
+bash setup-gcp.sh
 ```
+
+This idempotent script creates:
+- **Artifact Registry** – Docker repository for container images
+- **Cloud SQL** – PostgreSQL 16 instance (db-f1-micro)
+- **Service Account** – For Cloud Run with Cloud SQL permissions
+- **Secret Manager** – `DATABASE_URL` stored securely
+- **IAM bindings** – Cloud Build can deploy, Cloud Run can read secrets and connect to DB
+
+Safe to re-run — existing resources are skipped. Cloud SQL creation takes ~10 minutes the first time.
 
 ### 3. Connect GitHub to Cloud Build
 
