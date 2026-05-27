@@ -193,6 +193,16 @@ gcloud iam service-accounts add-iam-policy-binding "${SA_EMAIL}" \
     --project="${PROJECT_ID}" --quiet 2>/dev/null || true
 echo "  Done – Cloud Build can now deploy as Cloud Run SA."
 
+# Also grant deploy permissions to the Compute Engine default SA, since
+# Cloud Build triggers created via Developer Connect may use it.
+COMPUTE_SA="${PROJECT_NUMBER}-compute@developer.gserviceaccount.com"
+for ROLE in roles/run.admin roles/iam.serviceAccountUser roles/artifactregistry.writer roles/storage.objectViewer; do
+    gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
+        --member="serviceAccount:${COMPUTE_SA}" \
+        --role="${ROLE}" \
+        --condition=None --quiet 2>/dev/null || true
+done
+
 # ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
